@@ -1,23 +1,37 @@
-FROM php:8.3-cli
+# Use official PHP image with Apache
+FROM php:8.2-apache
+
+# Set working directory
+WORKDIR /var/www/html
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git curl unzip libpq-dev nodejs npm \
-    && docker-php-ext-install pdo pdo_pgsql
+    git \
+    unzip \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    curl \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
-# Install Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
 
-WORKDIR /app
+# Copy composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Copy project files
 COPY . .
 
+# Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
-RUN npm install
-RUN npm run build
-RUN php artisan key:generate
-RUN php artisan storage:link
 
-EXPOSE 10000
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-CMD php artisan migrate --force && php -S 0.0.0.0:10000 -t public
+# Expose port 80
+EXPOSE 80
+
+# Run Laravel server via Apache
+CMD ["apache2-foreground"]
